@@ -33,8 +33,7 @@ const TabNavigator = createBottomTabNavigator({
       }
     }
   })
-}
-)
+})
 const AppContainer = createAppContainer(TabNavigator)
 const styles = StyleSheet.create({
   container: {
