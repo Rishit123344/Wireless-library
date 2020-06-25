@@ -1,5 +1,5 @@
 import React from 'react'
-import {Text,View,TouchableOpacity,StyleSheet,TextInput,Image} from 'react-native'
+import {Text,View,TouchableOpacity,StyleSheet,TextInput,Image,KeyboardAvoidingView,Aler, Alert} from 'react-native'
 import * as Permissions from 'expo-permissions'
 import {BarCodeScanner} from 'expo-barcode-scanner'
 import firebase from 'firebase'
@@ -48,53 +48,67 @@ db.collection("books").doc(this.state.scannedBookId).get().then((doc)=>{
     if(book.bookAvailability){
         this.initiateBookIssue();
         transactionMessage='Book Issued'
+        Alert.alert(transactionMessage)
     }
     else{
         this.initiateBookReturn();
     transactionMessage='Book Returned'
+    Alert.alert(transactionMessage)
     }
 })
 this.setState({
     transactionMessage:transactionMessage
 })
     }
-    initiateBookIssue=async()=>{
+    initiateBookIssue = async ()=>{
+        //add a transaction
         db.collection("transactions").add({
-            'studentID':this.state.scannedStudentId,
-'bookID':this.state.scannedBookId,
-'date':firebase.firestore.Timestamp.now().toDate(),
-'transactionType':'Issue'
+          'studentId' : this.state.scannedStudentId,
+          'bookId' : this.state.scannedBookId,
+          'date' : firebase.firestore.Timestamp.now().toDate(),
+          'transactionType' : "Issue"
         })
+    
+        //change book status
         db.collection("books").doc(this.state.scannedBookId).update({
-            'bookAvailibility':false
+          'bookAvailability' : false
         })
-        db.collection("students").doc(this.state.scannedstudentId).update({
-            'NumberOfBooksIssued':firebase.firestore.FieldValue.increment(1)
+        //change number of issued books for student
+        db.collection("students").doc(this.state.scannedStudentId).update({
+          'numberOfBooksIssued' : firebase.firestore.FieldValue.increment(1)
         })
+    
         this.setState({
-            scannedStudentId:'',
-            scannedBookId:''
+          scannedStudentId : '',
+          scannedBookId: ''
         })
-    }
-    initiateBookReturn=async()=>{
+      }
+    
+      initiateBookReturn = async ()=>{
+        //add a transaction
         db.collection("transactions").add({
-            'studentID':this.state.scannedStudentId,
-'bookID':this.state.scannedBookId,
-'date':firebase.firestore.Timestamp.now().toDate(),
-'transactionType':'Return'
+          'studentId' : this.state.scannedStudentId,
+          'bookId' : this.state.scannedBookId,
+          'date'   : firebase.firestore.Timestamp.now().toDate(),
+          'transactionType' : "Return"
         })
+    
+        //change book status
         db.collection("books").doc(this.state.scannedBookId).update({
-            'bookAvailibility':true
+          'bookAvailability' : true
         })
-        db.collection("students").doc(this.state.scannedstudentId).update({
-            'NumberOfBooksIssued':firebase.firestore.FieldValue.increment(-1)
+    
+        //change book status
+        db.collection("students").doc(this.state.scannedStudentId).update({
+          'numberOfBooksIssued' : firebase.firestore.FieldValue.increment(-1)
         })
+    
         this.setState({
-            scannedStudentId:'',
-            scannedBookId:''
+          scannedStudentId : '',
+          scannedBookId : ''
         })
-    }
-    render(){
+      }
+      render(){
         const hasCameraPermissions=this.state.hasCameraPermissions;
         const scanned = this.state.scanned;
         const buttonState = this.state.buttonState;
@@ -105,18 +119,26 @@ this.setState({
         }
         else if(buttonState==='normal'){
 return(
-<View style={{flex:1,justifyContent:'center',alignItems:'center'}}>
+    <KeyboardAvoidingView behavior='padding'style={styles.container}>
     <View>
         <Image source={require("../assets/booklogo.jpg")}style={{width:200,height:200}}/>
     </View>
 <View style={styles.inputView}>
-<TextInput style={styles.inputbox}placeholder="Book ID"value={this.state.scannedBookId}></TextInput>
+<TextInput style={styles.inputbox}placeholder="Book ID"value={this.state.scannedBookId}onChangeText={(text)=>{
+this.setState({
+    scannedBookId:text
+})
+}}></TextInput>
 <TouchableOpacity style={styles.ScanButton}onPress={()=>{this.getPermissionsAsync("BookId")}}>
 <Text style={styles.buttontext}>Scan</Text>
 </TouchableOpacity>
 </View>
 <View style={styles.inputView}>
-<TextInput style={styles.inputbox}placeholder="Student ID"value={this.state.scannedStudentId}></TextInput>
+<TextInput style={styles.inputbox}placeholder="Student ID"value={this.state.scannedStudentId}onChangeText={(text)=>{
+    this.setState({
+        scannedStudentId:text
+    })
+}}></TextInput>
 <TouchableOpacity style={styles.ScanButton}onPress={()=>{this.getPermissionsAsync("StudentId")}}>
 <Text style={styles.buttontext}>Scan</Text>
 </TouchableOpacity>
@@ -125,7 +147,7 @@ return(
 <TouchableOpacity style={styles.submitButton}onPress={async ()=>{var transactionMessage=await this.handletransaction()}}>
     <Text style={styles.submitButtonText}>Submit</Text>
 </TouchableOpacity>
-</View>
+</KeyboardAvoidingView>
 );
 }
     }
@@ -169,5 +191,10 @@ submitButtonText:{
     fontSize:20,
     fontWeight:'bold',
     color:'white'
-}
+},
+container:{
+    flex:1,
+    justifyContent:'center',
+    alignItems:'center'
+},
 })
