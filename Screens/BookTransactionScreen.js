@@ -1,5 +1,5 @@
 import React from 'react'
-import {Text,View,TouchableOpacity,StyleSheet,TextInput,Image,KeyboardAvoidingView,Aler, Alert} from 'react-native'
+import {Text,View,TouchableOpacity,StyleSheet,TextInput,Image,KeyboardAvoidingView, Alert} from 'react-native'
 import * as Permissions from 'expo-permissions'
 import {BarCodeScanner} from 'expo-barcode-scanner'
 import firebase from 'firebase'
@@ -42,23 +42,93 @@ transactionMessage:''
           }
       }
       handletransaction=async()=>{
-var transactionMessage=null
-db.collection("books").doc(this.state.scannedBookId).get().then((doc)=>{
-    var book = doc.data()
-    if(book.bookAvailability){
-        this.initiateBookIssue();
-        transactionMessage='Book Issued'
-        Alert.alert(transactionMessage)
+          var transactionType=await this.checkBookEligibility();
+          if(!transactionType){
+              Alert.alert("The Book Does Not Exist In The Library")
+              this.setState({
+                  scannedStudentId:'',
+                  scannedBookId:''
+              })
+          }
+          else if(transactionType==='Issue'){
+              var isStudentEligible=await this.checkStudentEligibilityForBookIssue();
+              if(isStudentEligible){
+                  this.initiateBookIssue()
+                  Alert.alert("Book Issued To The Student")
+              }
+          }
+          else{
+              var isStudentEligible=await this.checkStudentEligibilityForBookReturn();
+              if(isStudentEligible){
+                this.initiateBookReturn()
+                Alert.alert("Book Returned To The Student")
+            }
+          }
     }
-    else{
-        this.initiateBookReturn();
-    transactionMessage='Book Returned'
-    Alert.alert(transactionMessage)
+    checkBookEligibility=async()=>{
+        const bookref = await db.collection("books").where("bookId","==",this.state.scannedBookId).get();
+        var transactionType = ''
+        if(bookref.docs.length===0){
+            transactionType=false;
+        }
+        else{
+            bookref.docs.map((doc)=>{
+var book = doc.data();
+if(book.bookAvailability){
+    transactionType = 'Issue'
+}
+else{transactionType = 'Return'}
+            })
+        }
+        return transactionType;
     }
-})
-this.setState({
-    transactionMessage:transactionMessage
-})
+    checkStudentEligibilityForBookIssue = async()=>{
+        const studentref = await db.collection("students").where("studentId","==",this.state.scannedStudentId).get();
+        var isStudentEligible = ''
+        if(studentref.docs.length===0){
+           this.setState({
+               scannedStudentId:'',
+               scannedBookId:''            
+           })
+           isStudentEligible = false
+           Alert.alert("The Student Id Does Not Exist In The DataBase")
+        }
+        else{
+            studentref.docs.map((doc)=>{
+                var student=doc.data();
+                if(student.numberOfBooksIssued<2){
+                    isStudentEligible=true
+                }
+                else{
+                    isStudentEligible=false
+                    Alert.alert("The Student Has Already Issued Two Books")
+                    this.setState({
+                        scannedBookId:'',
+                        scannedStudentId:''
+                    })
+                }
+            })
+        }
+        return isStudentEligible;
+    }
+    checkStudentEligibilityForBookReturn = async()=>{
+        const transactionref = await db.collection("transactions").where("bookId","==",this.state.scannedBookId).limit(1).get();
+      var isStudentEligible = ''
+      transactionref.docs.map((doc)=>{
+var lastbooktransaction = doc.data();
+if(lastbooktransaction.studentId===this.state.scannedStudentId){
+    isStudentEligible=true
+}
+else{
+    isStudentEligible=false
+    Alert.alert("The Book Was Not Issued By The Student")
+    this.setState({
+        scannedStudentId:'',
+        scannedBookId:''
+    })
+}
+      })
+      return isStudentEligible;
     }
     initiateBookIssue = async ()=>{
         //add a transaction
